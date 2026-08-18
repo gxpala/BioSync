@@ -50,6 +50,7 @@ export const Clients: React.FC = () => {
         status: 'ACTIVE'
       });
       fetchClients();
+      window.dispatchEvent(new Event('clientUpdated'));
     } catch (err: any) {
       showToast(err.response?.data?.detail || 'Failed to create client', 'error');
     }

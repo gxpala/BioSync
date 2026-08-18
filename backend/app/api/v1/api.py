@@ -1,12 +1,13 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     auth, clients, branches, devices, employees, shifts,
-    raw_punches, attendance, connector, adms_listener, dashboard, reports, audit
+    raw_punches, attendance, connector, adms_listener, dashboard, reports, audit, users
 )
 
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(users.router, prefix="/users", tags=["User Accounts"])
 api_router.include_router(clients.router, prefix="/clients", tags=["Clients"])
 api_router.include_router(branches.router, prefix="/branches", tags=["Branches"])
 api_router.include_router(devices.router, prefix="/devices", tags=["Devices"])

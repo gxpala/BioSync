@@ -1,18 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { LogOut, Building2, Server, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { LogOut, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import { Client } from '../types';
 
 export const Header: React.FC = () => {
-  const { user, logout, isSuperAdmin, selectedClientId, setSelectedClientId } = useAuth();
+  const { logout, isSuperAdmin, selectedClientId, setSelectedClientId } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
 
-  useEffect(() => {
+  const fetchClients = useCallback(() => {
     if (isSuperAdmin) {
       api.get('/clients').then((res) => setClients(res.data)).catch(() => {});
     }
   }, [isSuperAdmin]);
+
+  useEffect(() => {
+    fetchClients();
+
+    const handleClientUpdate = () => fetchClients();
+    window.addEventListener('clientUpdated', handleClientUpdate);
+    return () => {
+      window.removeEventListener('clientUpdated', handleClientUpdate);
+    };
+  }, [fetchClients]);
 
   return (
     <header className="h-16 bg-slate-950/80 backdrop-blur border-b border-slate-800/80 px-6 flex items-center justify-between sticky top-0 z-20">
@@ -24,6 +34,7 @@ export const Header: React.FC = () => {
             <span className="font-medium text-slate-400">Client Scope:</span>
             <select
               value={selectedClientId || ''}
+              onFocus={fetchClients}
               onChange={(e) => setSelectedClientId(e.target.value ? Number(e.target.value) : null)}
               className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
             >

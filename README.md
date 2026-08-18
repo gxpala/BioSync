@@ -91,6 +91,7 @@ python -m pytest -v
 ## Documentation Index
 
 - [Architecture Overview](docs/architecture.md)
+- [RBAC & Role Hierarchy](docs/rbac-hierarchy.md)
 - [Device Integration & Adapters](docs/device-integration.md)
 - [Local Connector Agent](docs/local-connector.md)
 - [Attendance Processing Engine](docs/attendance-engine.md)

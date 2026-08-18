@@ -136,6 +136,17 @@ export interface DailyAttendance {
   is_manually_edited: boolean;
 }
 
+export interface AuditLog {
+  id: number;
+  user_id?: number;
+  user_email?: string;
+  action: string;
+  entity: string;
+  entity_id?: string;
+  metadata_json?: string;
+  created_at: string;
+}
+
 export interface DriverCatalogItem {
   driver_code: string;
   driver_name: string;

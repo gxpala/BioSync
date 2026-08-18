@@ -12,10 +12,10 @@ import {
   FileSpreadsheet,
   MonitorCheck,
   ShieldCheck,
-  Settings,
-  ShieldAlert
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { MabiconsLogo } from './MabiconsLogo';
 
 export const Sidebar: React.FC = () => {
   const { user, isSuperAdmin } = useAuth();
@@ -39,12 +39,10 @@ export const Sidebar: React.FC = () => {
     <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col h-screen sticky top-0 z-30 shrink-0">
       {/* Brand Header */}
       <div className="p-5 border-b border-slate-800/80 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20 font-bold text-xl">
-          M
-        </div>
+        <MabiconsLogo size="md" />
         <div>
-          <h1 className="font-bold text-white text-base tracking-tight">Mabicons</h1>
-          <p className="text-xs text-sky-400 font-medium">Biometric Attendance</p>
+          <h1 className="font-bold text-white text-base tracking-tight leading-none">Mabicons</h1>
+          <p className="text-[11px] text-sky-400 font-medium mt-1">Biometric Platform</p>
         </div>
       </div>
 

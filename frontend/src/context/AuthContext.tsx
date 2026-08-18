@@ -5,7 +5,7 @@ import { User } from '../types';
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (token: str, user: User) => void;
+  login: (token: string, user: User) => void;
   logout: () => void;
   isSuperAdmin: boolean;
   isClientAdmin: boolean;

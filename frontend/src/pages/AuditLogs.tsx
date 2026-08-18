@@ -43,7 +43,7 @@ export const AuditLogs: React.FC = () => {
                 logs.map((l) => (
                   <tr key={l.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-mono text-slate-400">
-                      {new Date(l.timestamp).toLocaleString()}
+                      {l.created_at ? new Date(l.created_at).toLocaleString() : '-'}
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-white">{l.user_email || 'System'}</td>
                     <td className="py-3.5 px-4 font-mono text-sky-400 font-bold">{l.action}</td>
