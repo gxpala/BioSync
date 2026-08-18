@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mabicons_postgres
+    environment:
+      POSTGRES_USER: mabicons
+      POSTGRES_PASSWORD: mabicons_db_password_2026
+      POSTGRES_DB: mabicons_attendance
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mabicons -d mabicons_attendance"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mabicons_backend
+    environment:
+      DATABASE_URL: postgresql://mabicons:mabicons_db_password_2026@postgres:5432/mabicons_attendance
+      SECRET_KEY: mabicons_super_secret_jwt_key_2026_production_grade
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mabicons_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
