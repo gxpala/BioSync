@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { GitBranch, Plus, Search, MapPin, Globe } from 'lucide-react';
+import { GitBranch, Plus, Search, MapPin, Globe, Download } from 'lucide-react';
 import api from '../api/client';
 import { Branch, Client } from '../types';
 import { useToast } from '../context/ToastContext';
@@ -54,6 +54,25 @@ export const Branches: React.FC = () => {
     }
   };
 
+  const handleDownloadInstaller = async (clientCode: string, branchCode: string) => {
+    try {
+      const serverUrl = window.location.origin + '/api/v1';
+      const res = await api.get(`/connector/download-installer?client_code=${clientCode}&branch_code=${branchCode}&server_url=${encodeURIComponent(serverUrl)}`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Install_Mabicons_Agent_${clientCode}_${branchCode}.bat`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast(`Downloaded 1-click agent installer for ${clientCode} (${branchCode})`, 'success');
+    } catch (err) {
+      showToast('Failed to download agent installer', 'error');
+    }
+  };
+
   const filtered = branches.filter(
     (b) =>
       b.branch_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -91,6 +110,7 @@ export const Branches: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((b) => {
           const cli = clients.find((c) => c.id === b.client_id);
+          const clientCode = cli?.client_code || 'VYSOLAR';
           return (
             <div key={b.id} className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3">
               <div className="flex items-start justify-between">
@@ -117,6 +137,18 @@ export const Branches: React.FC = () => {
                   <span>Timezone: <code className="text-sky-300 font-mono">{b.timezone}</code></span>
                 </div>
               </div>
+
+              {isSuperAdmin && (
+                <div className="pt-3 border-t border-slate-800/80">
+                  <button
+                    onClick={() => handleDownloadInstaller(clientCode, b.branch_code)}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-950/60 hover:bg-sky-900 border border-sky-800/60 text-sky-300 text-xs font-semibold transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download 1-Click Client Agent Installer</span>
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

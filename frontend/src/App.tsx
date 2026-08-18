@@ -22,7 +22,7 @@ import { AuditLogs } from './pages/AuditLogs';
 import { Settings } from './pages/Settings';
 
 const ProtectedLayout: React.FC = () => {
-  const { token } = useAuth();
+  const { token, isSuperAdmin } = useAuth();
   if (!token) {
     return <Navigate to="/login" replace />;
   }
@@ -35,20 +35,23 @@ const ProtectedLayout: React.FC = () => {
         <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/clients" element={<Clients />} />
+            <Route path="/clients" element={isSuperAdmin ? <Clients /> : <Navigate to="/dashboard" replace />} />
             <Route path="/clients/:clientId" element={<ClientDetail />} />
             <Route path="/branches" element={<Branches />} />
-            <Route path="/devices" element={<Devices />} />
-            <Route path="/devices/new" element={<DeviceAddEdit />} />
-            <Route path="/devices/:id/edit" element={<DeviceAddEdit />} />
-            <Route path="/device-monitoring" element={<DeviceMonitoring />} />
+            
+            {/* Device Management restricted strictly to Super Admin */}
+            <Route path="/devices" element={isSuperAdmin ? <Devices /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/devices/new" element={isSuperAdmin ? <DeviceAddEdit /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/devices/:id/edit" element={isSuperAdmin ? <DeviceAddEdit /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/device-monitoring" element={isSuperAdmin ? <DeviceMonitoring /> : <Navigate to="/dashboard" replace />} />
+            
             <Route path="/employees" element={<Employees />} />
             <Route path="/live-punches" element={<LivePunches />} />
             <Route path="/raw-punches" element={<RawPunches />} />
             <Route path="/attendance" element={<DailyAttendanceView />} />
             <Route path="/shifts" element={<Shifts />} />
             <Route path="/reports" element={<Reports />} />
-            <Route path="/audit-logs" element={<AuditLogs />} />
+            <Route path="/audit-logs" element={isSuperAdmin ? <AuditLogs /> : <Navigate to="/dashboard" replace />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

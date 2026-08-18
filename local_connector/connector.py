@@ -30,6 +30,7 @@ class MabiconsLocalConnector:
         self.config = self.load_config()
         self.server_url = self.config.get("server_url", "http://localhost:8000/api/v1")
         self.secret_token = None
+        self.active_devices = []
         self.db_path = "connector_offline_buffer.db"
         self.init_offline_queue()
 
@@ -78,6 +79,7 @@ class MabiconsLocalConnector:
                 data = resp.json()
                 self.secret_token = data.get("secret_token")
                 logging.info(f"Successfully registered agent! Secret Token: {self.secret_token[:15]}...")
+                self.fetch_remote_device_config()
                 return True
             else:
                 logging.error(f"Cloud Registration failed: HTTP {resp.status_code} - {resp.text}")
@@ -86,12 +88,33 @@ class MabiconsLocalConnector:
             logging.error(f"Network error registering agent with Cloud API: {e}")
             return False
 
+    def fetch_remote_device_config(self):
+        """
+        Remote Device Provisioning (Option 3).
+        Dynamically fetches assigned device IP lists from the Mabicons Cloud API so
+        clients never need to edit local configuration files manually!
+        """
+        if not self.secret_token:
+            return
+        endpoint = f"{self.server_url}/connector/devices-config?secret_token={self.secret_token}"
+        try:
+            resp = requests.get(endpoint, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                self.active_devices = data.get("devices", [])
+                logging.info(f"Fetched {len(self.active_devices)} remote device configurations from Cloud API.")
+        except Exception as e:
+            logging.warning(f"Could not fetch remote device config: {e}")
+
     def send_heartbeat(self):
         if not self.secret_token:
             return
         endpoint = f"{self.server_url}/connector/heartbeat"
         device_statuses = []
-        for dev in self.config.get("devices", []):
+        
+        # Check active devices from local or remote config
+        target_devices = self.active_devices if self.active_devices else self.config.get("devices", [])
+        for dev in target_devices:
             device_statuses.append({
                 "serial_number": dev.get("serial_number"),
                 "status": "Online"
@@ -174,6 +197,7 @@ class MabiconsLocalConnector:
         while True:
             now = time.time()
             if now - last_hb > hb_interval:
+                self.fetch_remote_device_config()
                 self.send_heartbeat()
                 last_hb = now
 

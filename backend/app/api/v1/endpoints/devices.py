@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.core.database import get_db
-from app.core.rbac import get_current_user, enforce_tenant_isolation
+from app.core.rbac import get_current_user, require_super_admin
 from app.schemas.schemas import DeviceCreate, DeviceOut
 from app.models.all_models import Device, Client, Branch, User, UserRole, AuditLog
 from app.device_integration.registry import DeviceDriverRegistry
@@ -11,8 +11,8 @@ from app.device_integration.registry import DeviceDriverRegistry
 router = APIRouter()
 
 @router.get("/drivers")
-def get_registered_drivers(current_user: User = Depends(get_current_user)):
-    """Returns catalog of registered driver adapters in the system."""
+def get_registered_drivers(current_user: User = Depends(require_super_admin)):
+    """Returns catalog of registered driver adapters in the system (Super Admin Only)."""
     return DeviceDriverRegistry.list_drivers()
 
 @router.get("", response_model=List[DeviceOut])
@@ -22,17 +22,11 @@ def list_devices(
     status_filter: Optional[str] = None,
     brand_filter: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_super_admin)
 ):
     query = db.query(Device)
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.MABICONS_ADMIN]:
-        if current_user.client_id:
-            query = query.filter(Device.client_id == current_user.client_id)
-        else:
-            return []
-    elif client_id:
+    if client_id:
         query = query.filter(Device.client_id == client_id)
-
     if branch_id:
         query = query.filter(Device.branch_id == branch_id)
     if status_filter:
@@ -46,10 +40,8 @@ def list_devices(
 def create_device(
     payload: DeviceCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_super_admin)
 ):
-    enforce_tenant_isolation(current_user, payload.client_id)
-    
     existing = db.query(Device).filter(Device.serial_number == payload.serial_number.strip()).first()
     if existing:
         raise HTTPException(status_code=400, detail="Device with this Serial Number already registered")
@@ -87,21 +79,18 @@ def create_device(
     return device
 
 @router.get("/{device_id}", response_model=DeviceOut)
-def get_device(device_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_device(device_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_super_admin)):
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
-    enforce_tenant_isolation(current_user, device.client_id)
     return device
 
 @router.post("/{device_id}/test-connection")
-def test_device_connection(device_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def test_device_connection(device_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_super_admin)):
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
-    enforce_tenant_isolation(current_user, device.client_id)
 
-    # Resolve modular driver adapter from registry
     driver = DeviceDriverRegistry.get_driver(device.protocol_driver)
     
     device_config = {
@@ -115,9 +104,8 @@ def test_device_connection(device_id: int, db: Session = Depends(get_db), curren
 
     result = driver.test_connection(device_config)
     
-    # Update device status based on genuine test result
     if result.success:
-        device.status = "Online" if not result.is_mock else "Online"
+        device.status = "Online"
         device.last_seen = datetime.utcnow()
     else:
         if "not configured" in result.message.lower():
@@ -142,11 +130,10 @@ def test_device_connection(device_id: int, db: Session = Depends(get_db), curren
     return result.to_dict()
 
 @router.get("/{device_id}/info")
-def get_device_info(device_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_device_info(device_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_super_admin)):
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
-    enforce_tenant_isolation(current_user, device.client_id)
 
     driver = DeviceDriverRegistry.get_driver(device.protocol_driver)
     device_config = {
@@ -159,11 +146,10 @@ def get_device_info(device_id: int, db: Session = Depends(get_db), current_user:
     return result.to_dict()
 
 @router.post("/{device_id}/sync")
-def sync_device_attendance(device_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def sync_device_attendance(device_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_super_admin)):
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
-    enforce_tenant_isolation(current_user, device.client_id)
 
     driver = DeviceDriverRegistry.get_driver(device.protocol_driver)
     device_config = {"local_ip": device.local_ip, "port": device.port, "serial_number": device.serial_number}
