@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Shield, Server, UserPlus, Users, Key, Lock, CheckCircle2 } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Server, UserPlus, Users, Key, Lock, CheckCircle2, Sun, Moon, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme, ThemeMode } from '../context/ThemeContext';
 import api from '../api/client';
 import { useToast } from '../context/ToastContext';
 
@@ -15,6 +16,7 @@ interface UserAccount {
 
 export const Settings: React.FC = () => {
   const { user, isSuperAdmin } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [usersList, setUsersList] = useState<UserAccount[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -88,9 +90,55 @@ export const Settings: React.FC = () => {
       <div>
         <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
           <SettingsIcon className="w-5 h-5 text-sky-400" />
-          <span>Platform Settings & Account Security</span>
+          <span>Platform Settings & Appearance</span>
         </h1>
-        <p className="text-xs text-slate-400">System parameters, password settings, and portal user access management</p>
+        <p className="text-xs text-slate-400">System parameters, theme preferences, and portal user access management</p>
+      </div>
+
+      {/* Theme & Appearance Section */}
+      <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-4">
+        <h2 className="text-sm font-bold text-white flex items-center gap-2">
+          <Sun className="w-4 h-4 text-amber-400" />
+          <span>Theme & Appearance Mode</span>
+        </h2>
+        <p className="text-xs text-slate-400">Choose your preferred portal theme styling</p>
+        <div className="grid grid-cols-3 gap-3 pt-1">
+          <button
+            onClick={() => setTheme('light')}
+            className={`flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all text-xs font-semibold gap-2 ${
+              theme === 'light'
+                ? 'bg-amber-500/15 border-amber-500 text-amber-400 shadow-md'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sun className="w-5 h-5 text-amber-400" />
+            <span>Light Mode</span>
+          </button>
+
+          <button
+            onClick={() => setTheme('dark')}
+            className={`flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all text-xs font-semibold gap-2 ${
+              theme === 'dark'
+                ? 'bg-sky-500/15 border-sky-500 text-sky-400 shadow-md'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Moon className="w-5 h-5 text-sky-400" />
+            <span>Dark Mode</span>
+          </button>
+
+          <button
+            onClick={() => setTheme('system')}
+            className={`flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all text-xs font-semibold gap-2 ${
+              theme === 'system'
+                ? 'bg-indigo-500/15 border-indigo-500 text-indigo-400 shadow-md'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Monitor className="w-5 h-5 text-indigo-400" />
+            <span>System Default</span>
+          </button>
+        </div>
       </div>
 
       {/* User Session & Security Section */}

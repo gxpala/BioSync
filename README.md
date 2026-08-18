@@ -69,6 +69,38 @@ This spins up PostgreSQL database, FastAPI backend, and Vite frontend.
 
 ---
 
+## Production PostgreSQL Database Setup
+
+By default, the backend runs on local SQLite (`mabicons.db`) for zero-setup execution out-of-the-box. To connect to **PostgreSQL** for staging or production:
+
+### 1. Install & Create PostgreSQL Database
+Run in PostgreSQL (`psql`):
+```sql
+CREATE DATABASE mabicons_db;
+CREATE USER mabicons WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE mabicons_db TO mabicons;
+```
+
+### 2. Set Database Connection URL
+In `backend/.env` (or set environment variable):
+```env
+DATABASE_URL=postgresql://mabicons:your_secure_password@localhost:5432/mabicons_db
+```
+
+### 3. Install PostgreSQL Driver
+```bash
+cd backend
+pip install psycopg2-binary
+```
+
+### 4. Start Backend Server
+```bash
+python app/main.py
+```
+FastAPI & SQLAlchemy 2.0 will automatically create all 16 multi-tenant tables, indexes, unique constraints, and seed initial demo data in PostgreSQL!
+
+---
+
 ## Running Local Connector Agent (Private LANs)
 
 ```bash
