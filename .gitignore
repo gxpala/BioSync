@@ -1,0 +1,46 @@
+# Dependencies & Package Managers
+node_modules/
+venv/
+env/
+ENV/
+.venv/
+.pip-cache/
+
+# Build & Output Directories
+dist/
+build/
+.vite/
+.output/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local SQLite Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment Variables & Secrets (NEVER COMMIT REAL SECRETS)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE & OS Metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local Connector Runtime Logs
+local_connector/*.log
+local_connector/*.json
+!local_connector/config.example.json
