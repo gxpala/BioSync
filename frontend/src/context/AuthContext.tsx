@@ -21,7 +21,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : null;
   });
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('mabicons_token'));
-  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+
+  const [selectedClientId, setSelectedClientIdState] = useState<number | null>(() => {
+    const saved = localStorage.getItem('mabicons_selected_client_id');
+    return saved ? Number(saved) : null;
+  });
+
+  const setSelectedClientId = (id: number | null) => {
+    setSelectedClientIdState(id);
+    if (id !== null) {
+      localStorage.setItem('mabicons_selected_client_id', String(id));
+    } else {
+      localStorage.removeItem('mabicons_selected_client_id');
+    }
+  };
 
   useEffect(() => {
     if (token && !user) {
@@ -44,8 +57,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setToken(null);
     setUser(null);
+    setSelectedClientIdState(null);
     localStorage.removeItem('mabicons_token');
     localStorage.removeItem('mabicons_user');
+    localStorage.removeItem('mabicons_selected_client_id');
   };
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'MABICONS_ADMIN';

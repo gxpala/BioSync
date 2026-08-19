@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { GitBranch, Plus, Search, MapPin, Globe, Download } from 'lucide-react';
+import { GitBranch, Plus, Search, MapPin, Globe, Download, Trash2, Pencil } from 'lucide-react';
 import api from '../api/client';
 import { Branch, Client } from '../types';
-import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 
 export const Branches: React.FC = () => {
-  const { selectedClientId, isSuperAdmin } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Branch | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const { isSuperAdmin, selectedClientId } = useAuth();
+  const { showToast } = useToast();
+
   const [formData, setFormData] = useState({
     client_id: 1,
     branch_name: '',
@@ -22,16 +29,18 @@ export const Branches: React.FC = () => {
     timezone: 'Asia/Kolkata',
     status: 'ACTIVE'
   });
-  const { showToast } = useToast();
 
-  const loadData = async () => {
+  const fetchData = async () => {
     try {
-      const url = selectedClientId ? `/branches?client_id=${selectedClientId}` : '/branches';
-      const [bRes, cRes] = await Promise.all([api.get(url), api.get('/clients')]);
-      setBranches(bRes.data);
-      setClients(cRes.data);
-      if (cRes.data.length > 0) {
-        setFormData((prev) => ({ ...prev, client_id: cRes.data[0].id }));
+      const [branchRes, clientRes] = await Promise.all([
+        api.get('/branches', { params: { client_id: selectedClientId } }),
+        api.get('/clients')
+      ]);
+      setBranches(branchRes.data);
+      setClients(clientRes.data);
+      if (clientRes.data.length > 0) {
+        const targetClientId = selectedClientId || clientRes.data[0].id;
+        setFormData((prev) => ({ ...prev, client_id: targetClientId }));
       }
     } catch (err) {
       console.error(err);
@@ -39,37 +48,99 @@ export const Branches: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    fetchData();
   }, [selectedClientId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await api.post('/branches', formData);
-      showToast('Branch added successfully', 'success');
+      showToast('Branch created successfully', 'success');
       setShowModal(false);
-      loadData();
+      resetForm();
+      fetchData();
     } catch (err: any) {
-      showToast(err.response?.data?.detail || 'Failed to add branch', 'error');
+      showToast(err.response?.data?.detail || 'Failed to create branch', 'error');
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBranch) return;
+    try {
+      await api.put(`/branches/${editingBranch.id}`, formData);
+      showToast('Branch updated successfully', 'success');
+      setEditingBranch(null);
+      resetForm();
+      fetchData();
+    } catch (err: any) {
+      showToast(err.response?.data?.detail || 'Failed to update branch', 'error');
+    }
+  };
+
+  const openEditModal = (b: Branch) => {
+    setEditingBranch(b);
+    setFormData({
+      client_id: b.client_id,
+      branch_name: b.branch_name,
+      branch_code: b.branch_code,
+      address: b.address || '',
+      city: b.city || '',
+      state: b.state || '',
+      pincode: b.pincode || '',
+      timezone: b.timezone || 'Asia/Kolkata',
+      status: b.status || 'ACTIVE'
+    });
+  };
+
+  const resetForm = () => {
+    const targetClientId = selectedClientId || (clients[0]?.id || 1);
+    setFormData({
+      client_id: targetClientId,
+      branch_name: '',
+      branch_code: '',
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+      timezone: 'Asia/Kolkata',
+      status: 'ACTIVE'
+    });
+  };
+
+  const handleDeleteBranch = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/branches/${deleteTarget.id}`);
+      showToast(`Branch '${deleteTarget.branch_name}' deleted successfully`, 'success');
+      setDeleteTarget(null);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.response?.data?.detail || 'Failed to delete branch', 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleDownloadInstaller = async (clientCode: string, branchCode: string) => {
     try {
-      const serverUrl = window.location.origin + '/api/v1';
-      const res = await api.get(`/connector/download-installer?client_code=${clientCode}&branch_code=${branchCode}&server_url=${encodeURIComponent(serverUrl)}`, {
+      const serverUrl = window.location.origin;
+      const res = await api.get('/connector/download-installer', {
+        params: { client_code: clientCode, branch_code: branchCode, server_url: serverUrl },
         responseType: 'blob'
       });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Install_Mabicons_Agent_${clientCode}_${branchCode}.bat`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      showToast(`Downloaded 1-click agent installer for ${clientCode} (${branchCode})`, 'success');
-    } catch (err) {
-      showToast('Failed to download agent installer', 'error');
+      const blob = new Blob([res.data], { type: 'application/x-bat' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `install-mabicons-agent-${clientCode}-${branchCode}.bat`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast(`Downloaded installer script for Branch ${branchCode}`, 'success');
+    } catch (err: any) {
+      showToast('Failed to download agent installer script', 'error');
     }
   };
 
@@ -88,7 +159,10 @@ export const Branches: React.FC = () => {
           <p className="text-xs text-slate-400">Manage client office locations and timezone configurations</p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            resetForm();
+            setShowModal(true);
+          }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-semibold text-xs transition-all shadow-lg shadow-sky-600/20"
         >
           <Plus className="w-4 h-4" />
@@ -112,15 +186,31 @@ export const Branches: React.FC = () => {
           const cli = clients.find((c) => c.id === b.client_id);
           const clientCode = cli?.client_code || 'VYSOLAR';
           return (
-            <div key={b.id} className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3">
+            <div key={b.id} className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3 relative group">
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-white text-base">{b.branch_name}</h3>
                   <span className="font-mono text-[11px] text-sky-400 font-semibold">{b.branch_code}</span>
                 </div>
-                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                  {b.status}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    {b.status}
+                  </span>
+                  <button
+                    onClick={() => openEditModal(b)}
+                    className="p-1 rounded-lg bg-sky-950/60 border border-sky-800 text-sky-400 hover:bg-sky-600 hover:text-white transition-all"
+                    title="Edit Branch Details"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(b)}
+                    className="p-1 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-400 hover:bg-rose-600 hover:text-white transition-all"
+                    title="Delete Branch Location"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <p className="text-xs text-slate-400 font-medium">
@@ -154,20 +244,34 @@ export const Branches: React.FC = () => {
         })}
       </div>
 
-      {showModal && (
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        title="Delete Branch Location"
+        itemName={deleteTarget?.branch_name}
+        message="Are you sure you want to delete this office branch location? Active devices and employees registered to this branch will require re-assignment."
+        loading={deleting}
+        onConfirm={handleDeleteBranch}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* Create / Edit Modal */}
+      {(showModal || editingBranch) && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
-            <h2 className="text-base font-bold text-white">Add New Branch</h2>
-            <form onSubmit={handleCreate} className="space-y-3">
+            <h2 className="text-base font-bold text-white">
+              {editingBranch ? `Edit Branch: ${editingBranch.branch_name}` : 'Add New Branch'}
+            </h2>
+            <form onSubmit={editingBranch ? handleUpdate : handleCreate} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Select Client</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Target Client Organization</label>
                 <select
                   value={formData.client_id}
                   onChange={(e) => setFormData({ ...formData, client_id: Number(e.target.value) })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 cursor-pointer"
                 >
                   {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
+                    <option key={c.id} value={c.id} className="bg-slate-900 text-white">
                       {c.client_name} ({c.client_code})
                     </option>
                   ))}
@@ -193,7 +297,7 @@ export const Branches: React.FC = () => {
                   required
                   value={formData.branch_code}
                   onChange={(e) => setFormData({ ...formData, branch_code: e.target.value.toUpperCase() })}
-                  placeholder="e.g. JPR-01"
+                  placeholder="e.g. JPR007"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-sky-500"
                 />
               </div>
@@ -221,10 +325,37 @@ export const Branches: React.FC = () => {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Address</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Street address / Industrial Area"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 cursor-pointer"
+                >
+                  <option value="ACTIVE" className="bg-slate-900 text-white">ACTIVE</option>
+                  <option value="INACTIVE" className="bg-slate-900 text-white">INACTIVE</option>
+                </select>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingBranch(null);
+                    resetForm();
+                  }}
                   className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700"
                 >
                   Cancel
@@ -233,7 +364,7 @@ export const Branches: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-sky-600 text-white text-xs font-semibold hover:bg-sky-500"
                 >
-                  Save Branch
+                  {editingBranch ? 'Update Branch' : 'Save Branch'}
                 </button>
               </div>
             </form>

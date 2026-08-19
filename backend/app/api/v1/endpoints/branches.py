@@ -61,3 +61,70 @@ def create_branch(
     ))
     db.commit()
     return branch
+
+@router.put("/{branch_id}", response_model=BranchOut)
+def update_branch(
+    branch_id: int,
+    payload: BranchCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    enforce_tenant_isolation(current_user, branch.client_id)
+    enforce_tenant_isolation(current_user, payload.client_id)
+
+    branch.client_id = payload.client_id
+    branch.branch_name = payload.branch_name
+    branch.branch_code = payload.branch_code.upper()
+    branch.address = payload.address
+    branch.city = payload.city
+    branch.state = payload.state
+    branch.pincode = payload.pincode
+    branch.timezone = payload.timezone
+    branch.status = payload.status
+
+    db.commit()
+    db.refresh(branch)
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="BRANCH_UPDATE",
+        entity="branches",
+        entity_id=str(branch.id),
+        metadata_json=f"Updated branch {branch.branch_name}"
+    ))
+    db.commit()
+    return branch
+
+@router.delete("/{branch_id}", status_code=status.HTTP_200_OK)
+def delete_branch(
+    branch_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    enforce_tenant_isolation(current_user, branch.client_id)
+
+    branch_name = branch.branch_name
+
+    db.delete(branch)
+    db.commit()
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="BRANCH_DELETE",
+        entity="branches",
+        entity_id=str(branch_id),
+        metadata_json=f"Deleted branch {branch_name}"
+    ))
+    db.commit()
+
+    return {"message": f"Branch {branch_name} deleted successfully"}

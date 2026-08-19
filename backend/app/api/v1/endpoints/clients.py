@@ -70,7 +70,14 @@ def update_client(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
+    new_code = payload.client_code.strip().upper()
+    if new_code != client.client_code:
+        existing = db.query(Client).filter(Client.client_code == new_code, Client.id != client_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Client Code already in use by another client organization")
+
     client.client_name = payload.client_name
+    client.client_code = new_code
     client.contact_person = payload.contact_person
     client.email = payload.email
     client.phone = payload.phone
@@ -86,7 +93,35 @@ def update_client(
         action="CLIENT_UPDATE",
         entity="clients",
         entity_id=str(client.id),
-        metadata_json=f"Updated client {client.client_name}"
+        metadata_json=f"Updated client {client.client_name} ({client.client_code})"
     ))
     db.commit()
     return client
+
+@router.delete("/{client_id}", status_code=status.HTTP_200_OK)
+def delete_client(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin)
+):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    client_name = client.client_name
+    client_code = client.client_code
+
+    db.delete(client)
+    db.commit()
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="CLIENT_DELETE",
+        entity="clients",
+        entity_id=str(client_id),
+        metadata_json=f"Deleted client organization {client_name} ({client_code})"
+    ))
+    db.commit()
+
+    return {"message": f"Client {client_name} deleted successfully"}

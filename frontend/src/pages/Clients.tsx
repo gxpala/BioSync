@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, Plus, Search, CheckCircle2, AlertOctagon, XCircle, ArrowRight } from 'lucide-react';
+import { Building2, Plus, Search, CheckCircle2, AlertOctagon, XCircle, ArrowRight, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import { Client } from '../types';
 import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { useAuth } from '../context/AuthContext';
 
 export const Clients: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const [formData, setFormData] = useState({
     client_name: '',
     client_code: '',
@@ -18,8 +23,10 @@ export const Clients: React.FC = () => {
     address: '',
     status: 'ACTIVE'
   });
+
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { isSuperAdmin } = useAuth();
 
   const fetchClients = async () => {
     try {
@@ -40,19 +47,39 @@ export const Clients: React.FC = () => {
       await api.post('/clients', formData);
       showToast('Client created successfully', 'success');
       setShowModal(false);
-      setFormData({
-        client_name: '',
-        client_code: '',
-        contact_person: '',
-        email: '',
-        phone: '',
-        address: '',
-        status: 'ACTIVE'
-      });
+      resetForm();
       fetchClients();
       window.dispatchEvent(new Event('clientUpdated'));
     } catch (err: any) {
       showToast(err.response?.data?.detail || 'Failed to create client', 'error');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      client_name: '',
+      client_code: '',
+      contact_person: '',
+      email: '',
+      phone: '',
+      address: '',
+      status: 'ACTIVE'
+    });
+  };
+
+  const handleDeleteClient = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/clients/${deleteTarget.id}`);
+      showToast(`Client '${deleteTarget.client_name}' deleted successfully`, 'success');
+      setDeleteTarget(null);
+      fetchClients();
+      window.dispatchEvent(new Event('clientUpdated'));
+    } catch (err: any) {
+      showToast(err.response?.data?.detail || 'Failed to delete client', 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -69,13 +96,18 @@ export const Clients: React.FC = () => {
           <h1 className="text-xl font-bold text-white tracking-tight">Client Organizations</h1>
           <p className="text-xs text-slate-400">Manage client accounts, statuses, and multi-tenant hierarchies</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-semibold text-xs transition-all shadow-lg shadow-sky-600/20"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Client</span>
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-semibold text-xs transition-all shadow-lg shadow-sky-600/20"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Client</span>
+          </button>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -141,13 +173,24 @@ export const Clients: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => navigate(`/clients/${c.id}`)}
-                        className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 font-semibold text-xs"
-                      >
-                        <span>View Details</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
+                      <div className="inline-flex items-center gap-2.5 justify-end">
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => setDeleteTarget(c)}
+                            className="p-1.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-400 hover:bg-rose-600 hover:text-white transition-all"
+                            title="Delete Client Organization"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => navigate(`/clients/${c.id}`)}
+                          className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 font-semibold text-xs"
+                        >
+                          <span>Details</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -157,7 +200,18 @@ export const Clients: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        title="Delete Client Organization"
+        itemName={deleteTarget?.client_name}
+        message="Are you sure you want to permanently delete this client organization? This action will remove the client profile from the platform."
+        loading={deleting}
+        onConfirm={handleDeleteClient}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* Create Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
@@ -232,10 +286,26 @@ export const Clients: React.FC = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 cursor-pointer"
+                >
+                  <option value="ACTIVE" className="bg-slate-900 text-white">ACTIVE</option>
+                  <option value="SUSPENDED" className="bg-slate-900 text-white">SUSPENDED</option>
+                  <option value="INACTIVE" className="bg-slate-900 text-white">INACTIVE</option>
+                </select>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
                   className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700"
                 >
                   Cancel

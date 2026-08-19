@@ -68,6 +68,46 @@ def create_employee(
     db.commit()
     return employee
 
+@router.put("/{employee_id}", response_model=EmployeeOut)
+def update_employee(
+    employee_id: int,
+    payload: EmployeeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    emp = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    enforce_tenant_isolation(current_user, emp.client_id)
+    enforce_tenant_isolation(current_user, payload.client_id)
+
+    emp.client_id = payload.client_id
+    emp.branch_id = payload.branch_id
+    emp.employee_code = payload.employee_code.strip()
+    emp.default_device_user_id = payload.default_device_user_id or payload.employee_code.strip()
+    emp.employee_name = payload.employee_name
+    emp.email = payload.email
+    emp.phone = payload.phone
+    emp.department = payload.department
+    emp.designation = payload.designation
+    emp.joining_date = payload.joining_date
+    emp.status = payload.status
+
+    db.commit()
+    db.refresh(emp)
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="EMPLOYEE_UPDATE",
+        entity="employees",
+        entity_id=str(emp.id),
+        metadata_json=f"Updated employee {emp.employee_name} ({emp.employee_code})"
+    ))
+    db.commit()
+    return emp
+
 @router.get("/{employee_id}/mappings")
 def get_employee_device_mappings(
     employee_id: int,
@@ -109,7 +149,6 @@ def create_employee_device_mapping(
     if not dev:
         raise HTTPException(status_code=404, detail="Target Biometric Device not found")
 
-    # Upsert mapping
     mapping = db.query(EmployeeDeviceMapping).filter(
         EmployeeDeviceMapping.device_id == payload.device_id,
         EmployeeDeviceMapping.device_user_id == payload.device_user_id.strip()
@@ -128,3 +167,32 @@ def create_employee_device_mapping(
     db.commit()
     db.refresh(mapping)
     return {"message": "Employee device mapping saved successfully", "mapping_id": mapping.id}
+
+@router.delete("/{employee_id}", status_code=status.HTTP_200_OK)
+def delete_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    emp = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    enforce_tenant_isolation(current_user, emp.client_id)
+
+    emp_name = emp.employee_name
+
+    db.delete(emp)
+    db.commit()
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="EMPLOYEE_DELETE",
+        entity="employees",
+        entity_id=str(employee_id),
+        metadata_json=f"Deleted employee record {emp_name}"
+    ))
+    db.commit()
+
+    return {"message": f"Employee {emp_name} deleted successfully"}
