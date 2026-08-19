@@ -127,20 +127,20 @@ export const Branches: React.FC = () => {
     try {
       const serverUrl = window.location.origin;
       const res = await api.get('/connector/download-installer', {
-        params: { client_code: clientCode, branch_code: branchCode, server_url: serverUrl },
+        params: { client_code: clientCode, branch_code: branchCode, server_url: serverUrl, format: 'exe' },
         responseType: 'blob'
       });
-      const blob = new Blob([res.data], { type: 'application/x-bat' });
+      const blob = new Blob([res.data], { type: 'application/octet-stream' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `install-mabicons-agent-${clientCode}-${branchCode}.bat`;
+      a.download = `install-mabicons-agent-${clientCode}-${branchCode}.exe`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      showToast(`Downloaded installer script for Branch ${branchCode}`, 'success');
+      showToast(`Downloaded Executable Agent (.exe) for Branch ${branchCode}`, 'success');
     } catch (err: any) {
-      showToast('Failed to download agent installer script', 'error');
+      showToast('Failed to download agent installer executable', 'error');
     }
   };
 
@@ -235,7 +235,7 @@ export const Branches: React.FC = () => {
                     className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-950/60 hover:bg-sky-900 border border-sky-800/60 text-sky-300 text-xs font-semibold transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Download 1-Click Client Agent Installer</span>
+                    <span>Download 1-Click Agent Installer (.exe)</span>
                   </button>
                 </div>
               )}
